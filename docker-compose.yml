@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  pocketbase:
+    image: ghcr.io/pocketbase/pocketbase:latest
+    command: serve
+    restart: unless-stopped
+    volumes:
+      - ./pocketbase/pb_data:/pb_data
+    environment:
+      - POCKETBASE_HTTP_ADDR=0.0.0.0:8090
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    depends_on:
+      pocketbase:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - pocketbase
